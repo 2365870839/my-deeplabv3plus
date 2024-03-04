@@ -39,7 +39,7 @@ class Trainer(object):
         train_params = [{'params': model.get_1x_lr_params(), 'lr': args.lr},
                         {'params': model.get_10x_lr_params(), 'lr': args.lr * 10}]
 
-        # Define Optimizer
+        # Define Optimizer todo
         optimizer = torch.optim.SGD(train_params, momentum=args.momentum,
                                     weight_decay=args.weight_decay, nesterov=args.nesterov)
 

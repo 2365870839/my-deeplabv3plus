@@ -23,10 +23,13 @@ def decode_segmap(label_mask, dataset, plot=False):
     """
     if dataset == 'pascal' or dataset == 'coco':
         n_classes = 21
-        label_colours = get_pascal_labels()
+        label_colours = get_pascal_labels()     # 获取调色板
     elif dataset == 'cityscapes':
         n_classes = 19
         label_colours = get_cityscapes_labels()
+    elif isinstance(dataset,str):
+        n_classes = 2
+        label_colours = get_deepcrack_labels()
     else:
         raise NotImplementedError
 
@@ -99,3 +102,10 @@ def get_pascal_labels():
                        [64, 0, 128], [192, 0, 128], [64, 128, 128], [192, 128, 128],
                        [0, 64, 0], [128, 64, 0], [0, 192, 0], [128, 192, 0],
                        [0, 64, 128]])
+
+def get_deepcrack_labels():
+    """Load the mapping that associates pascal classes with label colors
+    Returns:
+        np.ndarray with dimensions (21, 3)
+    """
+    return np.asarray([[0,0,0],[255,255,255]])

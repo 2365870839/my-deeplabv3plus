@@ -72,7 +72,7 @@ class DeepLab(nn.Module):
                                 yield p
 
 if __name__ == "__main__":
-    model = DeepLab(backbone='mobilenet', output_stride=16)
+    model = DeepLab(backbone='resnet', output_stride=16)
     model.eval()
     input = torch.rand(1, 3, 513, 513)
     output = model(input)

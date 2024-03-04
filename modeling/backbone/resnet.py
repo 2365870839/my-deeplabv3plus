@@ -45,6 +45,7 @@ class Bottleneck(nn.Module):
 class ResNet(nn.Module):
 
     def __init__(self, block, layers, output_stride, BatchNorm, pretrained=True):
+        # layers = [3, 4, 23, 3]
         self.inplanes = 64
         super(ResNet, self).__init__()
         blocks = [1, 2, 4]
@@ -65,9 +66,35 @@ class ResNet(nn.Module):
         self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
 
         self.layer1 = self._make_layer(block, 64, layers[0], stride=strides[0], dilation=dilations[0], BatchNorm=BatchNorm)
+        # downsample = nn.Sequential(
+        #               nn.Conv2d(in_channels=64, out_channels=64*4, kernel_size=1, stride=1, bias=False)
+        #               nn.BatchNorm2d(in_channels=64*4)
+        # block(inplanes=64, planes=64, stride=1, dilation=1, downsample=dowensample, BatchNorm=nn.BatchNorm2d)
+        # block(inplanes=256, planes=64, stride=1, dilation=1, downsample=None, BatchNorm=nn.BatchNorm2d) * 2
+
         self.layer2 = self._make_layer(block, 128, layers[1], stride=strides[1], dilation=dilations[1], BatchNorm=BatchNorm)
+        # downsample = nn.Sequential(
+        #               nn.Conv2d(in_channels=256, out_channels=512, kernel_size=1, stride=2, bias=False)
+        #               nn.BatchNorm2d(in_channels=512)
+        # block(inplanes=256, planes=128, stride=2, dilation=1, downsample=dowensample, BatchNorm=nn.BatchNorm2d)
+        # block(inplanes=512, planes=128, stride=1, dilation=1, downsample=None, BatchNorm=nn.BatchNorm2d) * 3
+
+
         self.layer3 = self._make_layer(block, 256, layers[2], stride=strides[2], dilation=dilations[2], BatchNorm=BatchNorm)
+        # downsample = nn.Sequential(
+        #               nn.Conv2d(in_channels=512, out_channels=256*4, kernel_size=1, stride=1, bias=False)
+        #               nn.BatchNorm2d(in_channels=256*4)
+        # block(inplanes=512, planes=256, stride=1, dilation=2, downsample=dowensample, BatchNorm=nn.BatchNorm2d)
+        # block(inplanes=1024, planes=256, stride=1, dilation=2, downsample=None, BatchNorm=nn.BatchNorm2d) * 22
+
         self.layer4 = self._make_MG_unit(block, 512, blocks=blocks, stride=strides[3], dilation=dilations[3], BatchNorm=BatchNorm)
+        # downsample = nn.Sequential(
+        #               nn.Conv2d(in_channels=1024, out_channels=2048, kernel_size=1, stride=1, bias=False)
+        #               nn.BatchNorm2d(in_channels=2048)
+        # block(inplanes=1024, planes=512, stride=1, dilation=4, downsample=dowensample, BatchNorm=nn.BatchNorm2d)
+        # block(inplanes=2048, planes=512, stride=1, dilation=8, downsample=None, BatchNorm=nn.BatchNorm2d)
+        # block(inplanes=2048, planes=512, stride=1, dilation=16, downsample=None, BatchNorm=nn.BatchNorm2d)
+
         # self.layer4 = self._make_layer(block, 512, layers[3], stride=strides[3], dilation=dilations[3], BatchNorm=BatchNorm)
         self._init_weight()
 
@@ -111,16 +138,16 @@ class ResNet(nn.Module):
         return nn.Sequential(*layers)
 
     def forward(self, input):
-        x = self.conv1(input)
+        # input: 1,3,512,512
+        x = self.conv1(input)  # 1,64,256,256
         x = self.bn1(x)
         x = self.relu(x)
-        x = self.maxpool(x)
-
-        x = self.layer1(x)
+        x = self.maxpool(x)  # 1,64,128,128
+        x = self.layer1(x)  # 1,256,128,128
         low_level_feat = x
-        x = self.layer2(x)
-        x = self.layer3(x)
-        x = self.layer4(x)
+        x = self.layer2(x)  # 1,512,64,64
+        x = self.layer3(x)  # 1,1024,64,64
+        x = self.layer4(x)  # 1,2048,64,64
         return x, low_level_feat
 
     def _init_weight(self):
