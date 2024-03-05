@@ -14,20 +14,21 @@ from utils.saver import Saver
 from utils.summaries import TensorboardSummary
 from utils.metrics import Evaluator
 
+
 class Trainer(object):
     def __init__(self, args):
         self.args = args
 
         # Define Saver
         self.saver = Saver(args)
-        self.saver.save_experiment_config()
+        self.saver.save_experiment_config()     # 记录超参数到日志文件
         # Define Tensorboard Summary
         self.summary = TensorboardSummary(self.saver.experiment_dir)
         self.writer = self.summary.create_summary()
-        
+
         # Define Dataloader
-        kwargs = {'num_workers': args.workers, 'pin_memory': True}
-        self.train_loader, self.val_loader, self.test_loader, self.nclass = make_data_loader(args, **kwargs)
+        kwargs = {'num_workers': args.workers, 'pin_memory': True}  # pin_memory:加速数据读取，但内存占用会多
+        self.train_loader, self.val_loader, self.test_loader, self.nclass = make_data_loader(args, **kwargs)    # 这里test_loader是None
 
         # Define network
         model = DeepLab(num_classes=self.nclass,
@@ -46,7 +47,7 @@ class Trainer(object):
         # Define Criterion
         # whether to use class balanced weights
         if args.use_balanced_weights:
-            classes_weights_path = os.path.join(Path.db_root_dir(args.dataset), args.dataset+'_classes_weights.npy')
+            classes_weights_path = os.path.join(Path.db_root_dir(args.dataset), args.dataset + '_classes_weights.npy')
             if os.path.isfile(classes_weights_path):
                 weight = np.load(classes_weights_path)
             else:
@@ -56,12 +57,12 @@ class Trainer(object):
             weight = None
         self.criterion = SegmentationLosses(weight=weight, cuda=args.cuda).build_loss(mode=args.loss_type)
         self.model, self.optimizer = model, optimizer
-        
+
         # Define Evaluator
         self.evaluator = Evaluator(self.nclass)
         # Define lr scheduler
         self.scheduler = LR_Scheduler(args.lr_scheduler, args.lr,
-                                            args.epochs, len(self.train_loader))
+                                      args.epochs, len(self.train_loader))
 
         # Using cuda
         if args.cuda:
@@ -73,7 +74,7 @@ class Trainer(object):
         self.best_pred = 0.0
         if args.resume is not None:
             if not os.path.isfile(args.resume):
-                raise RuntimeError("=> no checkpoint found at '{}'" .format(args.resume))
+                raise RuntimeError("=> no checkpoint found at '{}'".format(args.resume))
             checkpoint = torch.load(args.resume)
             args.start_epoch = checkpoint['epoch']
             if args.cuda:
@@ -118,7 +119,7 @@ class Trainer(object):
         print('[Epoch: %d, numImages: %5d]' % (epoch, i * self.args.batch_size + image.data.shape[0]))
         print('Loss: %.3f' % train_loss)
 
-        if self.args.no_val:
+        if self.args.no_val:        # 如果选择了不进行验证，直接保存checkpoint
             # save checkpoint every epoch
             is_best = False
             self.saver.save_checkpoint({
@@ -127,7 +128,6 @@ class Trainer(object):
                 'optimizer': self.optimizer.state_dict(),
                 'best_pred': self.best_pred,
             }, is_best)
-
 
     def validation(self, epoch):
         self.model.eval()
@@ -175,6 +175,7 @@ class Trainer(object):
                 'best_pred': self.best_pred,
             }, is_best)
 
+
 def main():
     parser = argparse.ArgumentParser(description="PyTorch DeeplabV3Plus Training")
     parser.add_argument('--backbone', type=str, default='resnet',
@@ -182,10 +183,10 @@ def main():
                         help='backbone name (default: resnet)')
     parser.add_argument('--out-stride', type=int, default=16,
                         help='network output stride (default: 8)')
-    parser.add_argument('--dataset', type=str, default='pascal',
-                        choices=['pascal', 'coco', 'cityscapes'],
+    parser.add_argument('--dataset', type=str, default='deepcrack',
+                        choices=['pascal', 'coco', 'cityscapes', 'deepcrack'],
                         help='dataset name (default: pascal)')
-    parser.add_argument('--use-sbd', action='store_true', default=True,
+    parser.add_argument('--use-sbd', action='store_true', default=False,
                         help='whether to use SBD dataset (default: True)')
     parser.add_argument('--workers', type=int, default=4,
                         metavar='N', help='dataloader threads')
@@ -197,15 +198,15 @@ def main():
                         help='whether to use sync bn (default: auto)')
     parser.add_argument('--freeze-bn', type=bool, default=False,
                         help='whether to freeze bn parameters (default: False)')
-    parser.add_argument('--loss-type', type=str, default='ce',
+    parser.add_argument('--loss-type', type=str, default='ce',  # todo
                         choices=['ce', 'focal'],
                         help='loss func type (default: ce)')
     # training hyper params
-    parser.add_argument('--epochs', type=int, default=None, metavar='N',
+    parser.add_argument('--epochs', type=int, default=300, metavar='N',  # todo
                         help='number of epochs to train (default: auto)')
     parser.add_argument('--start_epoch', type=int, default=0,
                         metavar='N', help='start epochs (default:0)')
-    parser.add_argument('--batch-size', type=int, default=None,
+    parser.add_argument('--batch-size', type=int, default=32,  # todo
                         metavar='N', help='input batch size for \
                                 training (default: auto)')
     parser.add_argument('--test-batch-size', type=int, default=None,
@@ -214,9 +215,9 @@ def main():
     parser.add_argument('--use-balanced-weights', action='store_true', default=False,
                         help='whether to use balanced weights (default: False)')
     # optimizer params
-    parser.add_argument('--lr', type=float, default=None, metavar='LR',
+    parser.add_argument('--lr', type=float, default=None, metavar='LR',  # todo
                         help='learning rate (default: auto)')
-    parser.add_argument('--lr-scheduler', type=str, default='poly',
+    parser.add_argument('--lr-scheduler', type=str, default='poly',  # todo
                         choices=['poly', 'step', 'cos'],
                         help='lr scheduler mode: (default: poly)')
     parser.add_argument('--momentum', type=float, default=0.9,
@@ -227,7 +228,7 @@ def main():
                         help='whether use nesterov (default: False)')
     # cuda, seed and logging
     parser.add_argument('--no-cuda', action='store_true', default=
-                        False, help='disables CUDA training')
+    False, help='disables CUDA training')
     parser.add_argument('--gpu-ids', type=str, default='0',
                         help='use which gpu to train, must be a \
                         comma-separated list of integers only (default=0)')
@@ -242,19 +243,21 @@ def main():
     parser.add_argument('--ft', action='store_true', default=False,
                         help='finetuning on a different dataset')
     # evaluation option
-    parser.add_argument('--eval-interval', type=int, default=1,
+    parser.add_argument('--eval-interval', type=int, default=1,     # 验证间隔轮数
                         help='evaluuation interval (default: 1)')
     parser.add_argument('--no-val', action='store_true', default=False,
                         help='skip validation during training')
 
     args = parser.parse_args()
-    args.cuda = not args.no_cuda and torch.cuda.is_available()
+
+    args.cuda = not args.no_cuda and torch.cuda.is_available()  # 检查是否设置要用gpu加速以及cuda是否可用
     if args.cuda:
         try:
-            args.gpu_ids = [int(s) for s in args.gpu_ids.split(',')]
+            args.gpu_ids = [int(s) for s in args.gpu_ids.split(',')]    # 参与训练的gpu的id列表
         except ValueError:
             raise ValueError('Argument --gpu_ids must be a comma-separated list of integers only')
 
+    # 单卡训练sync_bn关闭，多卡训练才开
     if args.sync_bn is None:
         if args.cuda and len(args.gpu_ids) > 1:
             args.sync_bn = True
@@ -284,20 +287,20 @@ def main():
         }
         args.lr = lrs[args.dataset.lower()] / (4 * len(args.gpu_ids)) * args.batch_size
 
-
     if args.checkname is None:
-        args.checkname = 'deeplab-'+str(args.backbone)
+        args.checkname = 'deeplab-' + str(args.backbone)
     print(args)
-    torch.manual_seed(args.seed)
+    torch.manual_seed(args.seed)    # 设置随机数种子
     trainer = Trainer(args)
     print('Starting Epoch:', trainer.args.start_epoch)
     print('Total Epoches:', trainer.args.epochs)
-    for epoch in range(trainer.args.start_epoch, trainer.args.epochs):
+    for epoch in range(trainer.args.start_epoch, trainer.args.epochs):  # 迭代训练
         trainer.training(epoch)
-        if not trainer.args.no_val and epoch % args.eval_interval == (args.eval_interval - 1):
+        if not trainer.args.no_val and epoch % args.eval_interval == (args.eval_interval - 1):  # 判断是否要进行验证
             trainer.validation(epoch)
 
     trainer.writer.close()
 
+
 if __name__ == "__main__":
-   main()
+    main()

@@ -82,18 +82,18 @@ class ResNet(nn.Module):
 
         self.layer3 = self._make_layer(block, 256, layers[2], stride=strides[2], dilation=dilations[2], BatchNorm=BatchNorm)
         # downsample = nn.Sequential(
-        #               nn.Conv2d(in_channels=512, out_channels=256*4, kernel_size=1, stride=1, bias=False)
+        #               nn.Conv2d(in_channels=512, out_channels=256*4, kernel_size=1, stride=2, bias=False)
         #               nn.BatchNorm2d(in_channels=256*4)
-        # block(inplanes=512, planes=256, stride=1, dilation=2, downsample=dowensample, BatchNorm=nn.BatchNorm2d)
-        # block(inplanes=1024, planes=256, stride=1, dilation=2, downsample=None, BatchNorm=nn.BatchNorm2d) * 22
+        # block(inplanes=512, planes=256, stride=2, dilation=1, downsample=dowensample, BatchNorm=nn.BatchNorm2d)
+        # block(inplanes=1024, planes=256, stride=1, dilation=1, downsample=None, BatchNorm=nn.BatchNorm2d) * 22
 
         self.layer4 = self._make_MG_unit(block, 512, blocks=blocks, stride=strides[3], dilation=dilations[3], BatchNorm=BatchNorm)
         # downsample = nn.Sequential(
         #               nn.Conv2d(in_channels=1024, out_channels=2048, kernel_size=1, stride=1, bias=False)
         #               nn.BatchNorm2d(in_channels=2048)
-        # block(inplanes=1024, planes=512, stride=1, dilation=4, downsample=dowensample, BatchNorm=nn.BatchNorm2d)
+        # block(inplanes=1024, planes=512, stride=1, dilation=2, downsample=dowensample, BatchNorm=nn.BatchNorm2d)
+        # block(inplanes=2048, planes=512, stride=1, dilation=4, downsample=None, BatchNorm=nn.BatchNorm2d)
         # block(inplanes=2048, planes=512, stride=1, dilation=8, downsample=None, BatchNorm=nn.BatchNorm2d)
-        # block(inplanes=2048, planes=512, stride=1, dilation=16, downsample=None, BatchNorm=nn.BatchNorm2d)
 
         # self.layer4 = self._make_layer(block, 512, layers[3], stride=strides[3], dilation=dilations[3], BatchNorm=BatchNorm)
         self._init_weight()
@@ -146,8 +146,8 @@ class ResNet(nn.Module):
         x = self.layer1(x)  # 1,256,128,128
         low_level_feat = x
         x = self.layer2(x)  # 1,512,64,64
-        x = self.layer3(x)  # 1,1024,64,64
-        x = self.layer4(x)  # 1,2048,64,64
+        x = self.layer3(x)  # 1,1024,32,32
+        x = self.layer4(x)  # 1,2048,32,32
         return x, low_level_feat
 
     def _init_weight(self):
@@ -182,7 +182,7 @@ def ResNet101(output_stride, BatchNorm, pretrained=True):
 
 if __name__ == "__main__":
     import torch
-    model = ResNet101(BatchNorm=nn.BatchNorm2d, pretrained=True, output_stride=8)
+    model = ResNet101(BatchNorm=nn.BatchNorm2d, pretrained=True, output_stride=16)
     input = torch.rand(1, 3, 512, 512)
     output, low_level_feat = model(input)
     print(output.size())
