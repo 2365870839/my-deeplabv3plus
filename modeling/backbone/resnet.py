@@ -1,7 +1,10 @@
 import math
 import torch.nn as nn
+import torch
 import torch.utils.model_zoo as model_zoo
 from modeling.sync_batchnorm.batchnorm import SynchronizedBatchNorm2d
+import torch.nn.functional as F
+from modeling.selayer import  SELayer
 
 class Bottleneck(nn.Module):
     expansion = 4
@@ -64,6 +67,7 @@ class ResNet(nn.Module):
         self.bn1 = BatchNorm(64)
         self.relu = nn.ReLU(inplace=True)
         self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
+        self.selayer = SELayer(1792)
 
         self.layer1 = self._make_layer(block, 64, layers[0], stride=strides[0], dilation=dilations[0], BatchNorm=BatchNorm)
         # downsample = nn.Sequential(
@@ -144,10 +148,16 @@ class ResNet(nn.Module):
         x = self.relu(x)
         x = self.maxpool(x)  # 1,64,128,128
         x = self.layer1(x)  # 1,256,128,128
-        low_level_feat = x
+        low_level_feat_1 = x
         x = self.layer2(x)  # 1,512,64,64
+        low_level_feat_2 = x
+        low_level_feat_2 = F.interpolate(low_level_feat_2, size=low_level_feat_1.size()[2:], mode='bilinear', align_corners=True)
         x = self.layer3(x)  # 1,1024,32,32
+        low_level_feat_3 = x
+        low_level_feat_3 = F.interpolate(low_level_feat_3, size=low_level_feat_1.size()[2:], mode='bilinear', align_corners=True)
         x = self.layer4(x)  # 1,2048,32,32
+        low_level_feat = torch.cat((low_level_feat_1,low_level_feat_2,low_level_feat_3), dim=1)
+        low_level_feat = self.selayer(low_level_feat)
         return x, low_level_feat
 
     def _init_weight(self):
