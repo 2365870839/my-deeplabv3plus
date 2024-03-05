@@ -25,6 +25,8 @@ class Trainer(object):
         # Define Tensorboard Summary
         self.summary = TensorboardSummary(self.saver.experiment_dir)
         self.writer = self.summary.create_summary()
+        self.log_writer = open(os.path.join(self.saver.experiment_dir, "log.txt"), 'w')
+
 
         # Define Dataloader
         kwargs = {'num_workers': args.workers, 'pin_memory': True}  # pin_memory:加速数据读取，但内存占用会多
@@ -91,7 +93,7 @@ class Trainer(object):
         if args.ft:
             args.start_epoch = 0
 
-    def training(self, epoch):
+    def training(self, epoch):  # 一个epoch的训练
         train_loss = 0.0
         self.model.train()
         tbar = tqdm(self.train_loader)
@@ -117,7 +119,9 @@ class Trainer(object):
 
         self.writer.add_scalar('train/total_loss_epoch', train_loss, epoch)
         print('[Epoch: %d, numImages: %5d]' % (epoch, i * self.args.batch_size + image.data.shape[0]))
+        self.log_writer.write('[Epoch: %d, numImages: %5d]\n' % (epoch, i * self.args.batch_size + image.data.shape[0]))
         print('Loss: %.3f' % train_loss)
+        self.log_writer.write('Loss: %.3f\n' % train_loss)
 
         if self.args.no_val:        # 如果选择了不进行验证，直接保存checkpoint
             # save checkpoint every epoch
@@ -154,15 +158,21 @@ class Trainer(object):
         Acc_class = self.evaluator.Pixel_Accuracy_Class()
         mIoU = self.evaluator.Mean_Intersection_over_Union()
         FWIoU = self.evaluator.Frequency_Weighted_Intersection_over_Union()
+        Dice = self.evaluator.Dice_score()
         self.writer.add_scalar('val/total_loss_epoch', test_loss, epoch)
         self.writer.add_scalar('val/mIoU', mIoU, epoch)
         self.writer.add_scalar('val/Acc', Acc, epoch)
         self.writer.add_scalar('val/Acc_class', Acc_class, epoch)
         self.writer.add_scalar('val/fwIoU', FWIoU, epoch)
+        self.writer.add_scalar('val/Dice', Dice, epoch)
         print('Validation:')
+        self.log_writer.write('Validation:\n')
         print('[Epoch: %d, numImages: %5d]' % (epoch, i * self.args.batch_size + image.data.shape[0]))
-        print("Acc:{}, Acc_class:{}, mIoU:{}, fwIoU: {}".format(Acc, Acc_class, mIoU, FWIoU))
+        self.log_writer.write('[Epoch: %d, numImages: %5d]\n' % (epoch, i * self.args.batch_size + image.data.shape[0]))
+        print("Acc:{}, Acc_class:{}, mIoU:{}, fwIoU: {}, Dice: {}".format(Acc, Acc_class, mIoU, FWIoU, Dice))
+        self.log_writer.write("Acc:{}, Acc_class:{}, mIoU:{}, fwIoU: {}, Dice: {}\n".format(Acc, Acc_class, mIoU, FWIoU, Dice))
         print('Loss: %.3f' % test_loss)
+        self.log_writer.write('Loss: %.3f\n' % test_loss)
 
         new_pred = mIoU
         if new_pred > self.best_pred:
@@ -300,6 +310,7 @@ def main():
             trainer.validation(epoch)
 
     trainer.writer.close()
+    trainer.log_writer.close()
 
 
 if __name__ == "__main__":
