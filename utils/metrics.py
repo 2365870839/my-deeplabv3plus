@@ -46,8 +46,9 @@ class Evaluator(object):
 
         precision = true_positive / (true_positive + false_positive)
         recall = true_positive / (true_positive + false_negative)
+        F1score = 2*precision*recall/(precision+recall)
 
-        return precision, recall
+        return precision, recall, F1score
 
     def _generate_matrix(self, gt_image, pre_image):    # 混淆矩阵
         mask = (gt_image >= 0) & (gt_image < self.num_class)
