@@ -122,6 +122,7 @@ class Trainer(object):
         self.log_writer.write('[Epoch: %d, numImages: %5d]\n' % (epoch, i * self.args.batch_size + image.data.shape[0]))
         print('Loss: %.3f' % train_loss)
         self.log_writer.write('Loss: %.3f\n' % train_loss)
+        self.log_writer.flush()
 
         if self.args.no_val:        # 如果选择了不进行验证，直接保存checkpoint
             # save checkpoint every epoch
@@ -159,20 +160,24 @@ class Trainer(object):
         mIoU = self.evaluator.Mean_Intersection_over_Union()
         FWIoU = self.evaluator.Frequency_Weighted_Intersection_over_Union()
         Dice = self.evaluator.Dice_score()
+        Precision, Recall = self.evaluator.precision_recall()
         self.writer.add_scalar('val/total_loss_epoch', test_loss, epoch)
         self.writer.add_scalar('val/mIoU', mIoU, epoch)
         self.writer.add_scalar('val/Acc', Acc, epoch)
         self.writer.add_scalar('val/Acc_class', Acc_class, epoch)
         self.writer.add_scalar('val/fwIoU', FWIoU, epoch)
         self.writer.add_scalar('val/Dice', Dice, epoch)
+        self.writer.add_scalar('val/Precision', Precision, epoch)
+        self.writer.add_scalar('val/Recall', Recall, epoch)
         print('Validation:')
         self.log_writer.write('Validation:\n')
         print('[Epoch: %d, numImages: %5d]' % (epoch, i * self.args.batch_size + image.data.shape[0]))
         self.log_writer.write('[Epoch: %d, numImages: %5d]\n' % (epoch, i * self.args.batch_size + image.data.shape[0]))
-        print("Acc:{}, Acc_class:{}, mIoU:{}, fwIoU: {}, Dice: {}".format(Acc, Acc_class, mIoU, FWIoU, Dice))
-        self.log_writer.write("Acc:{}, Acc_class:{}, mIoU:{}, fwIoU: {}, Dice: {}\n".format(Acc, Acc_class, mIoU, FWIoU, Dice))
+        print("Acc:{}, Acc_class:{}, mIoU:{}, fwIoU: {}, Dice: {}, Precision: {}, Recall: {}".format(Acc, Acc_class, mIoU, FWIoU, Dice, Precision, Recall))
+        self.log_writer.write("Acc:{}, Acc_class:{}, mIoU:{}, fwIoU: {}, Dice: {}, Precision: {}, Recall: {}\n".format(Acc, Acc_class, mIoU, FWIoU, Dice, Precision, Recall))
         print('Loss: %.3f' % test_loss)
         self.log_writer.write('Loss: %.3f\n' % test_loss)
+        self.log_writer.flush()
 
         new_pred = mIoU
         if new_pred > self.best_pred:
@@ -216,7 +221,7 @@ def main():
                         help='number of epochs to train (default: auto)')
     parser.add_argument('--start_epoch', type=int, default=0,
                         metavar='N', help='start epochs (default:0)')
-    parser.add_argument('--batch-size', type=int, default=32,  # todo
+    parser.add_argument('--batch-size', type=int, default=4,  # todo
                         metavar='N', help='input batch size for \
                                 training (default: auto)')
     parser.add_argument('--test-batch-size', type=int, default=None,
@@ -294,6 +299,7 @@ def main():
             'coco': 0.1,
             'cityscapes': 0.01,
             'pascal': 0.007,
+            'deepcrack': 0.007
         }
         args.lr = lrs[args.dataset.lower()] / (4 * len(args.gpu_ids)) * args.batch_size
 
