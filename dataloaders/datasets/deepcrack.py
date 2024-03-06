@@ -45,7 +45,7 @@ class DeepCrack(Dataset):
         self.images = []  # 原图的路径列表
         self.categories = []  # 标签图的路径列表
 
-        for splt in self.split:  # splt是train或val
+        for splt in self.split:  # splt是train或val或test
             with open(os.path.join(os.path.join(_splits_dir, splt + '.txt')),
                       "r") as f:  # path_to_dataset_folder/ImageSets/Segmentation/train.txt
                 lines = f.read().splitlines()
@@ -76,7 +76,7 @@ class DeepCrack(Dataset):
         for split in self.split:
             if split == "train":
                 return self.transform_tr(sample)  # 训练数据处理，返回预处理+数据增强后的结果,返回字典，字典里的value由PIL转为了Tensor
-            elif split == 'val':
+            elif split == 'val' or split == 'test':
                 return self.transform_val(sample)  # 验证数据处理，返回预处理的结果，不做数据增强，返回字典，字典里的value由PIL转为了Tensor
 
     def _make_img_gt_point_pair(self, index):
@@ -130,11 +130,11 @@ if __name__ == '__main__':
     for ii, sample in enumerate(dataloader):
         # 因为数据集类实现了gititem方法，所以这里的sample就是gititem方法的返回值，即做过预处理的存储在字典中的Tensor类型的原图和mask数据
         # 因为创建Dataloader时设置batchsize为5，所以每次取5组原图+标签，合并到一起（batchsize维度上合并），在放入sample中
-        for jj in range(sample["image"].size()[0]): # batchsize维度
-            img = sample['image'].numpy()   # ndarray类型原图
-            gt = sample['label'].numpy()    # ndarray类型标签
+        for jj in range(sample["image"].size()[0]):  # batchsize维度
+            img = sample['image'].numpy()  # ndarray类型原图
+            gt = sample['label'].numpy()  # ndarray类型标签
             tmp = np.array(gt[jj]).astype(np.uint8)
-            segmap = decode_segmap(tmp, dataset='deepcrack')   # mask调色板
+            segmap = decode_segmap(tmp, dataset='deepcrack')  # mask调色板
             img_tmp = np.transpose(img[jj], axes=[1, 2, 0])
             img_tmp *= (0.229, 0.224, 0.225)
             img_tmp += (0.485, 0.456, 0.406)
