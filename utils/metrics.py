@@ -31,7 +31,26 @@ class Evaluator(object):
         FWIoU = (freq[freq > 0] * iu[freq > 0]).sum()
         return FWIoU
 
-    def _generate_matrix(self, gt_image, pre_image):
+    def Dice_score(self):
+        true_positive = self.confusion_matrix[1, 1]
+        false_positive = self.confusion_matrix[0, 1]
+        false_negative = self.confusion_matrix[1, 0]
+
+        Dice = 2 * true_positive / (2 * true_positive + false_positive + false_negative)
+        return Dice
+
+    def precision_recall(self):
+        true_positive = self.confusion_matrix[1, 1]
+        false_positive = self.confusion_matrix[0, 1]
+        false_negative = self.confusion_matrix[1, 0]
+
+        precision = true_positive / (true_positive + false_positive)
+        recall = true_positive / (true_positive + false_negative)
+        F1score = 2*precision*recall/(precision+recall)
+
+        return precision, recall, F1score
+
+    def _generate_matrix(self, gt_image, pre_image):    # 混淆矩阵
         mask = (gt_image >= 0) & (gt_image < self.num_class)
         label = self.num_class * gt_image[mask].astype('int') + pre_image[mask]
         count = np.bincount(label, minlength=self.num_class**2)
