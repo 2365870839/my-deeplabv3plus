@@ -8,7 +8,7 @@ class Decoder(nn.Module):
     def __init__(self, num_classes, backbone, BatchNorm):
         super(Decoder, self).__init__()
         if backbone == 'resnet' or backbone == 'drn':
-            low_level_inplanes = 1792
+            low_level_inplanes = 768
         elif backbone == 'xception':
             low_level_inplanes = 128
         elif backbone == 'mobilenet':

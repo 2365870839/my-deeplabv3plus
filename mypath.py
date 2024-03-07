@@ -10,7 +10,7 @@ class Path(object):
         elif dataset == 'coco':
             return '/path/to/datasets/coco/'
         elif dataset == 'deepcrack':
-            return 'F:/PAPERWORK/dataset/DeepCrack/'
+            return '/mnt/workspace/DeepCrack'
         else:
             print('Dataset {} not available.'.format(dataset))
             raise NotImplementedError
