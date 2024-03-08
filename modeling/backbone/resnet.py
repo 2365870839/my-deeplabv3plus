@@ -66,9 +66,9 @@ class ResNet(nn.Module):
         self.bn1 = BatchNorm(64)
         self.relu = nn.ReLU(inplace=True)
         self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
-        self.dsconv1 = DSConv_pro(256,256,device='cpu')
-        self.dsconv2 = DSConv_pro(512, 256, device='cpu')
-        self.dsconv3 = DSConv_pro(1024, 256, device='cpu')
+        self.dsconv1 = DSConv_pro(256,256,device='cuda')
+        self.dsconv2 = DSConv_pro(512, 256, device='cuda')
+        self.dsconv3 = DSConv_pro(1024, 256, device='cuda')
 
         self.layer1 = self._make_layer(block, 64, layers[0], stride=strides[0], dilation=dilations[0], BatchNorm=BatchNorm)
         # downsample = nn.Sequential(
