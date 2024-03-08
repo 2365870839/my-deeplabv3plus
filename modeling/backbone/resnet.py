@@ -2,6 +2,8 @@ import math
 import torch.nn as nn
 import torch.utils.model_zoo as model_zoo
 from modeling.sync_batchnorm.batchnorm import SynchronizedBatchNorm2d
+from modeling.DSConv_pro import DSConv_pro
+import torch.nn.functional as F
 
 class Bottleneck(nn.Module):
     expansion = 4
@@ -64,6 +66,9 @@ class ResNet(nn.Module):
         self.bn1 = BatchNorm(64)
         self.relu = nn.ReLU(inplace=True)
         self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
+        self.dsconv1 = DSConv_pro(256,256,device='cpu')
+        self.dsconv2 = DSConv_pro(512, 256, device='cpu')
+        self.dsconv3 = DSConv_pro(1024, 256, device='cpu')
 
         self.layer1 = self._make_layer(block, 64, layers[0], stride=strides[0], dilation=dilations[0], BatchNorm=BatchNorm)
         # downsample = nn.Sequential(
@@ -144,11 +149,17 @@ class ResNet(nn.Module):
         x = self.relu(x)
         x = self.maxpool(x)  # 1,64,128,128
         x = self.layer1(x)  # 1,256,128,128
-        low_level_feat = x
+        feat1 = self.dsconv1(x)
         x = self.layer2(x)  # 1,512,64,64
+        feat2 = self.dsconv2(x)
         x = self.layer3(x)  # 1,1024,32,32
+        feat3 = self.dsconv3(x)
         x = self.layer4(x)  # 1,2048,32,32
-        return x, low_level_feat
+        feat3 = F.interpolate(feat3,size=feat2.size()[2:],mode='bilinear',align_corners=True)
+        feat2 = feat2 + feat3
+        feat2 = F.interpolate(feat2,size=feat1.size()[2:],mode='bilinear',align_corners=True)
+        out = feat2+feat1
+        return x, out
 
     def _init_weight(self):
         for m in self.modules():

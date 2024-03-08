@@ -76,7 +76,7 @@ class DeepCrack(Dataset):
         for split in self.split:
             if split == "train":
                 return self.transform_tr(sample)  # 训练数据处理，返回预处理+数据增强后的结果,返回字典，字典里的value由PIL转为了Tensor
-            elif split == 'val':
+            elif split == 'val' and split == 'test':
                 return self.transform_val(sample)  # 验证数据处理，返回预处理的结果，不做数据增强，返回字典，字典里的value由PIL转为了Tensor
 
     def _make_img_gt_point_pair(self, index):
