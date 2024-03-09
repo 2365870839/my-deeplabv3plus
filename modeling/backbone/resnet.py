@@ -1,9 +1,11 @@
 import math
 import torch.nn as nn
+import torch
 import torch.utils.model_zoo as model_zoo
 from modeling.sync_batchnorm.batchnorm import SynchronizedBatchNorm2d
 from modeling.DSConv_pro import DSConv_pro
 import torch.nn.functional as F
+
 
 class Bottleneck(nn.Module):
     expansion = 4
@@ -44,6 +46,26 @@ class Bottleneck(nn.Module):
 
         return out
 
+
+class DSC_block(nn.Module):
+    def __init__(self, in_ch, out_ch, device):
+        super(DSC_block, self).__init__()
+        self.dsconv_x = DSConv_pro(in_ch, out_ch, morph=0, device=device)
+        self.dsconv_y = DSConv_pro(in_ch, out_ch, morph=1, device=device)
+        self.conv1 = nn.Conv2d(in_ch + 2 * out_ch, out_ch, 1)
+        self.bn = nn.BatchNorm2d(out_ch)
+        self.relu = nn.ReLU(inplace=True)
+
+    def forward(self, x):
+        x_x = self.dsconv_x(x)
+        x_y = self.dsconv_y(x)
+        x = torch.cat([x, x_x, x_y], dim=1)
+        x = self.conv1(x)
+        x = self.bn(x)
+        x = self.relu(x)
+        return x
+
+
 class ResNet(nn.Module):
 
     def __init__(self, block, layers, output_stride, BatchNorm, pretrained=True):
@@ -62,37 +84,42 @@ class ResNet(nn.Module):
 
         # Modules
         self.conv1 = nn.Conv2d(3, 64, kernel_size=7, stride=2, padding=3,
-                                bias=False)
+                               bias=False)
         self.bn1 = BatchNorm(64)
         self.relu = nn.ReLU(inplace=True)
         self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
-        self.dsconv1 = DSConv_pro(256,256,device='cuda')
-        self.dsconv2 = DSConv_pro(512, 256, device='cuda')
-        self.dsconv3 = DSConv_pro(1024, 256, device='cuda')
+        self.dsc1 = DSC_block(64, 64, 'cpu')
+        self.dsc2 = DSC_block(256, 256, 'cpu')
+        self.dsc3 = DSC_block(512, 512, 'cpu')
+        # self.dsc4 = DSC_block(1024, 1024, 'cpu')
+        self.conv2 = nn.Conv2d(832, 256, 1)
 
-        self.layer1 = self._make_layer(block, 64, layers[0], stride=strides[0], dilation=dilations[0], BatchNorm=BatchNorm)
+        self.layer1 = self._make_layer(block, 64, layers[0], stride=strides[0], dilation=dilations[0],
+                                       BatchNorm=BatchNorm)
         # downsample = nn.Sequential(
         #               nn.Conv2d(in_channels=64, out_channels=64*4, kernel_size=1, stride=1, bias=False)
         #               nn.BatchNorm2d(in_channels=64*4)
         # block(inplanes=64, planes=64, stride=1, dilation=1, downsample=dowensample, BatchNorm=nn.BatchNorm2d)
         # block(inplanes=256, planes=64, stride=1, dilation=1, downsample=None, BatchNorm=nn.BatchNorm2d) * 2
 
-        self.layer2 = self._make_layer(block, 128, layers[1], stride=strides[1], dilation=dilations[1], BatchNorm=BatchNorm)
+        self.layer2 = self._make_layer(block, 128, layers[1], stride=strides[1], dilation=dilations[1],
+                                       BatchNorm=BatchNorm)
         # downsample = nn.Sequential(
         #               nn.Conv2d(in_channels=256, out_channels=512, kernel_size=1, stride=2, bias=False)
         #               nn.BatchNorm2d(in_channels=512)
         # block(inplanes=256, planes=128, stride=2, dilation=1, downsample=dowensample, BatchNorm=nn.BatchNorm2d)
         # block(inplanes=512, planes=128, stride=1, dilation=1, downsample=None, BatchNorm=nn.BatchNorm2d) * 3
 
-
-        self.layer3 = self._make_layer(block, 256, layers[2], stride=strides[2], dilation=dilations[2], BatchNorm=BatchNorm)
+        self.layer3 = self._make_layer(block, 256, layers[2], stride=strides[2], dilation=dilations[2],
+                                       BatchNorm=BatchNorm)
         # downsample = nn.Sequential(
         #               nn.Conv2d(in_channels=512, out_channels=256*4, kernel_size=1, stride=2, bias=False)
         #               nn.BatchNorm2d(in_channels=256*4)
         # block(inplanes=512, planes=256, stride=2, dilation=1, downsample=dowensample, BatchNorm=nn.BatchNorm2d)
         # block(inplanes=1024, planes=256, stride=1, dilation=1, downsample=None, BatchNorm=nn.BatchNorm2d) * 22
 
-        self.layer4 = self._make_MG_unit(block, 512, blocks=blocks, stride=strides[3], dilation=dilations[3], BatchNorm=BatchNorm)
+        self.layer4 = self._make_MG_unit(block, 512, blocks=blocks, stride=strides[3], dilation=dilations[3],
+                                         BatchNorm=BatchNorm)
         # downsample = nn.Sequential(
         #               nn.Conv2d(in_channels=1024, out_channels=2048, kernel_size=1, stride=1, bias=False)
         #               nn.BatchNorm2d(in_channels=2048)
@@ -133,12 +160,12 @@ class ResNet(nn.Module):
             )
 
         layers = []
-        layers.append(block(self.inplanes, planes, stride, dilation=blocks[0]*dilation,
+        layers.append(block(self.inplanes, planes, stride, dilation=blocks[0] * dilation,
                             downsample=downsample, BatchNorm=BatchNorm))
         self.inplanes = planes * block.expansion
         for i in range(1, len(blocks)):
             layers.append(block(self.inplanes, planes, stride=1,
-                                dilation=blocks[i]*dilation, BatchNorm=BatchNorm))
+                                dilation=blocks[i] * dilation, BatchNorm=BatchNorm))
 
         return nn.Sequential(*layers)
 
@@ -148,18 +175,18 @@ class ResNet(nn.Module):
         x = self.bn1(x)
         x = self.relu(x)
         x = self.maxpool(x)  # 1,64,128,128
+        x1 = self.dsc1(x)  # 1,64,128,128
         x = self.layer1(x)  # 1,256,128,128
-        feat1 = self.dsconv1(x)
+        x2 = self.dsc2(x)  # 1,256,128,128
         x = self.layer2(x)  # 1,512,64,64
-        feat2 = self.dsconv2(x)
+        x3 = self.dsc3(x)  # 1,512,64,64
+        x3 = F.interpolate(x3, x2.size()[2:], mode='bilinear', align_corners=True)  # 1,512,128,128
         x = self.layer3(x)  # 1,1024,32,32
-        feat3 = self.dsconv3(x)
         x = self.layer4(x)  # 1,2048,32,32
-        feat3 = F.interpolate(feat3,size=feat2.size()[2:],mode='bilinear',align_corners=True)
-        feat2 = feat2 + feat3
-        feat2 = F.interpolate(feat2,size=feat1.size()[2:],mode='bilinear',align_corners=True)
-        out = feat2+feat1
-        return x, out
+        fused_map = torch.cat([x1, x2, x3], dim=1)  # 1,832,128,128
+        fused_map = self.conv2(fused_map)  # 1,256,128,128
+
+        return x, fused_map
 
     def _init_weight(self):
         for m in self.modules():
@@ -183,6 +210,7 @@ class ResNet(nn.Module):
         state_dict.update(model_dict)
         self.load_state_dict(state_dict)
 
+
 def ResNet101(output_stride, BatchNorm, pretrained=True):
     """Constructs a ResNet-101 model.
     Args:
@@ -191,8 +219,10 @@ def ResNet101(output_stride, BatchNorm, pretrained=True):
     model = ResNet(Bottleneck, [3, 4, 23, 3], output_stride, BatchNorm, pretrained=pretrained)
     return model
 
+
 if __name__ == "__main__":
     import torch
+
     model = ResNet101(BatchNorm=nn.BatchNorm2d, pretrained=True, output_stride=16)
     input = torch.rand(1, 3, 512, 512)
     output, low_level_feat = model(input)
