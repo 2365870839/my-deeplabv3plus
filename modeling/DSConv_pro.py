@@ -6,20 +6,19 @@ import torch
 from torch import nn
 import einops
 
-
 """Dynamic Snake Convolution Module"""
 
 
 class DSConv_pro(nn.Module):
     def __init__(
-        self,
-        in_channels: int = 1,
-        out_channels: int = 1,
-        kernel_size: int = 9,
-        extend_scope: float = 1.0,
-        morph: int = 0,
-        if_offset: bool = True,
-        device: Union[str, torch.device] = "cuda",
+            self,
+            in_channels: int = 1,
+            out_channels: int = 1,
+            kernel_size: int = 9,
+            extend_scope: float = 1.0,
+            morph: int = 0,
+            if_offset: bool = True,
+            device: Union[str, torch.device] = "cuda",
     ):
         """
         A Dynamic Snake Convolution Implementation
@@ -106,10 +105,10 @@ class DSConv_pro(nn.Module):
 
 
 def get_coordinate_map_2D(
-    offset: torch.Tensor,
-    morph: int,
-    extend_scope: float = 1.0,
-    device: Union[str, torch.device] = "cuda",
+        offset: torch.Tensor,
+        morph: int,
+        extend_scope: float = 1.0,
+        device: Union[str, torch.device] = "cuda",
 ):
     """Computing 2D coordinate map of DSCNet based on: TODO
 
@@ -168,10 +167,10 @@ def get_coordinate_map_2D(
 
         for index in range(1, center + 1):
             y_offset_new_[center + index] = (
-                y_offset_new_[center + index - 1] + y_offset_[center + index]
+                    y_offset_new_[center + index - 1] + y_offset_[center + index]
             )
             y_offset_new_[center - index] = (
-                y_offset_new_[center - index + 1] + y_offset_[center - index]
+                    y_offset_new_[center - index + 1] + y_offset_[center - index]
             )
 
         y_offset_new_ = einops.rearrange(y_offset_new_, "k b w h -> b k w h")
@@ -209,10 +208,10 @@ def get_coordinate_map_2D(
 
         for index in range(1, center + 1):
             x_offset_new_[center + index] = (
-                x_offset_new_[center + index - 1] + x_offset_[center + index]
+                    x_offset_new_[center + index - 1] + x_offset_[center + index]
             )
             x_offset_new_[center - index] = (
-                x_offset_new_[center - index + 1] + x_offset_[center - index]
+                    x_offset_new_[center - index + 1] + x_offset_[center - index]
             )
 
         x_offset_new_ = einops.rearrange(x_offset_new_, "k b w h -> b k w h")
@@ -226,10 +225,10 @@ def get_coordinate_map_2D(
 
 
 def get_interpolated_feature(
-    input_feature: torch.Tensor,
-    y_coordinate_map: torch.Tensor,
-    x_coordinate_map: torch.Tensor,
-    interpolate_mode: str = "bilinear",
+        input_feature: torch.Tensor,
+        y_coordinate_map: torch.Tensor,
+        x_coordinate_map: torch.Tensor,
+        interpolate_mode: str = "bilinear",
 ):
     """From coordinate map interpolate feature of DSCNet based on: TODO
 
@@ -271,9 +270,9 @@ def get_interpolated_feature(
 
 
 def _coordinate_map_scaling(
-    coordinate_map: torch.Tensor,
-    origin: list,
-    target: list = [-1, 1],
+        coordinate_map: torch.Tensor,
+        origin: list,
+        target: list = [-1, 1],
 ):
     """Map the value of coordinate_map from origin=[min, max] to target=[a,b] for DSCNet based on: TODO
 
@@ -294,3 +293,22 @@ def _coordinate_map_scaling(
     coordinate_map_scaled = a + scale_factor * (coordinate_map_scaled - min)
 
     return coordinate_map_scaled
+
+
+class DSC_block(nn.Module):
+    def __init__(self, in_ch, out_ch, device, kernel_size=9):
+        super(DSC_block, self).__init__()
+        self.dsconv_x = DSConv_pro(in_ch, out_ch, kernel_size=kernel_size, morph=0, device=device)
+        self.dsconv_y = DSConv_pro(in_ch, out_ch, kernel_size=kernel_size, morph=1, device=device)
+        self.conv1 = nn.Conv2d(2 * out_ch, out_ch, 1)
+        self.bn = nn.BatchNorm2d(out_ch)
+        self.relu = nn.ReLU(inplace=True)
+
+    def forward(self, x):
+        x_x = self.dsconv_x(x)
+        x_y = self.dsconv_y(x)
+        x = torch.cat([x_x, x_y], dim=1)
+        x = self.conv1(x)
+        x = self.bn(x)
+        x = self.relu(x)
+        return x

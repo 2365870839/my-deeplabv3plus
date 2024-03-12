@@ -3,6 +3,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from modeling.sync_batchnorm.batchnorm import SynchronizedBatchNorm2d
+from modeling.SPM import StripPooling
+from modeling.DSConv_pro import DSC_block
 
 class _ASPPModule(nn.Module):
     def __init__(self, inplanes, planes, kernel_size, padding, dilation, BatchNorm):
@@ -52,10 +54,11 @@ class ASPP(nn.Module):
         self.aspp3 = _ASPPModule(inplanes, 256, 3, padding=dilations[2], dilation=dilations[2], BatchNorm=BatchNorm)
         self.aspp4 = _ASPPModule(inplanes, 256, 3, padding=dilations[3], dilation=dilations[3], BatchNorm=BatchNorm)
 
-        self.global_avg_pool = nn.Sequential(nn.AdaptiveAvgPool2d((1, 1)),
-                                             nn.Conv2d(inplanes, 256, 1, stride=1, bias=False),
-                                             BatchNorm(256),
-                                             nn.ReLU())
+        self.strip_pooling = StripPooling(inplanes, up_kwargs={'mode': 'bilinear', 'align_corners': True})
+        # self.global_avg_pool = nn.Sequential(nn.AdaptiveAvgPool2d((1, 1)),
+        #                                      nn.Conv2d(inplanes, 256, 1, stride=1, bias=False),
+        #                                      BatchNorm(256),
+        #                                      nn.ReLU())
         self.conv1 = nn.Conv2d(1280, 256, 1, bias=False)
         self.bn1 = BatchNorm(256)
         self.relu = nn.ReLU()
@@ -67,8 +70,7 @@ class ASPP(nn.Module):
         x2 = self.aspp2(x)
         x3 = self.aspp3(x)
         x4 = self.aspp4(x)
-        x5 = self.global_avg_pool(x)
-        x5 = F.interpolate(x5, size=x4.size()[2:], mode='bilinear', align_corners=True)
+        x5 = self.strip_pooling(x)
         x = torch.cat((x1, x2, x3, x4, x5), dim=1)
 
         x = self.conv1(x)
