@@ -48,10 +48,10 @@ class Bottleneck(nn.Module):
 
 
 class DSC_block(nn.Module):
-    def __init__(self, in_ch, out_ch, device):
+    def __init__(self, in_ch, out_ch, device, kernel_size=9):
         super(DSC_block, self).__init__()
-        self.dsconv_x = DSConv_pro(in_ch, out_ch, morph=0, device=device)
-        self.dsconv_y = DSConv_pro(in_ch, out_ch, morph=1, device=device)
+        self.dsconv_x = DSConv_pro(in_ch, out_ch, kernel_size=kernel_size, morph=0, device=device)
+        self.dsconv_y = DSConv_pro(in_ch,  out_ch, kernel_size=kernel_size, morph=1, device=device)
         self.conv1 = nn.Conv2d(in_ch + 2 * out_ch, out_ch, 1)
         self.bn = nn.BatchNorm2d(out_ch)
         self.relu = nn.ReLU(inplace=True)
@@ -88,11 +88,11 @@ class ResNet(nn.Module):
         self.bn1 = BatchNorm(64)
         self.relu = nn.ReLU(inplace=True)
         self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
-        self.dsc1 = DSC_block(64, 64, 'cpu')
-        self.dsc2 = DSC_block(256, 256, 'cpu')
-        self.dsc3 = DSC_block(512, 512, 'cpu')
+        self.dsc1 = DSC_block(256, 256, 'cpu')
+        self.dsc2 = DSC_block(512, 256, 'cpu')
+        self.dsc3 = DSC_block(1024, 256, 'cpu')
         # self.dsc4 = DSC_block(1024, 1024, 'cpu')
-        self.conv2 = nn.Conv2d(832, 256, 1)
+        self.conv2 = nn.Conv2d(768, 256, 1)
 
         self.layer1 = self._make_layer(block, 64, layers[0], stride=strides[0], dilation=dilations[0],
                                        BatchNorm=BatchNorm)
@@ -175,15 +175,16 @@ class ResNet(nn.Module):
         x = self.bn1(x)
         x = self.relu(x)
         x = self.maxpool(x)  # 1,64,128,128
-        x1 = self.dsc1(x)  # 1,64,128,128
         x = self.layer1(x)  # 1,256,128,128
-        x2 = self.dsc2(x)  # 1,256,128,128
+        x1 = self.dsc1(x)  # 1,256,128,128
         x = self.layer2(x)  # 1,512,64,64
-        x3 = self.dsc3(x)  # 1,512,64,64
-        x3 = F.interpolate(x3, x2.size()[2:], mode='bilinear', align_corners=True)  # 1,512,128,128
+        x2 = self.dsc2(x)  # 1,256,64,64
+        x2 = F.interpolate(x2, x1.size()[2:], mode='bilinear', align_corners=True)  # 1,256,128,128
         x = self.layer3(x)  # 1,1024,32,32
+        x3 = self.dsc3(x)   # 1,256,32,32
+        x3 = F.interpolate(x3, x1.size()[2:], mode='bilinear', align_corners=True)  # 1,256,128,128
         x = self.layer4(x)  # 1,2048,32,32
-        fused_map = torch.cat([x1, x2, x3], dim=1)  # 1,832,128,128
+        fused_map = torch.cat([x1, x2, x3], dim=1)  # 1,768,128,128
         fused_map = self.conv2(fused_map)  # 1,256,128,128
 
         return x, fused_map

@@ -223,7 +223,7 @@ def main():
                         help='number of epochs to train (default: auto)')
     parser.add_argument('--start_epoch', type=int, default=0,
                         metavar='N', help='start epochs (default:0)')
-    parser.add_argument('--batch-size', type=int, default=4,  # todo
+    parser.add_argument('--batch-size', type=int, default=2,  # todo
                         metavar='N', help='input batch size for \
                                 training (default: auto)')
     parser.add_argument('--test-batch-size', type=int, default=None,
@@ -308,7 +308,7 @@ def main():
     if args.checkname is None:
         args.checkname = 'deeplab-' + str(args.backbone)
     print(args)
-    torch.manual_seed(args.seed)    # 设置随机数种子
+    #torch.manual_seed(args.seed)    # 设置随机数种子
     trainer = Trainer(args)
     print('Starting Epoch:', trainer.args.start_epoch)
     print('Total Epoches:', trainer.args.epochs)
